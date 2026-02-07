@@ -1,37 +1,90 @@
 from datetime import datetime, timezone
 from hashlib import md5
+import sqlalchemy as sa
+import sqlalchemy.orm as so
+
 from app import db, login
-from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
+from werkzeug.security import generate_password_hash, check_password_hash
+
+
+# Followers association table
+followers = sa.Table(
+    'followers',
+    db.metadata,
+    sa.Column('follower_id', sa.Integer, sa.ForeignKey('user.id'),
+              primary_key=True),
+    sa.Column('followed_id', sa.Integer, sa.ForeignKey('user.id'),
+              primary_key=True)
+)
 
 
 class User(UserMixin, db.Model):
-    id = db.Column(db.Integer, primary_key=True)
+    id = sa.Column(sa.Integer, primary_key=True)
+    username = sa.Column(sa.String(64), index=True, unique=True)
+    email = sa.Column(sa.String(120), index=True, unique=True)
+    password_hash = sa.Column(sa.String(256))
+    about_me = sa.Column(sa.String(140))
+    last_seen = sa.Column(sa.DateTime,
+                          default=lambda: datetime.now(timezone.utc))
 
-    username = db.Column(db.String(64), index=True, unique=True)
-    email = db.Column(db.String(120), index=True, unique=True)
+    posts = so.relationship('Post', back_populates='author')
 
-    password_hash = db.Column(db.String(256))
-
-    about_me = db.Column(db.String(140))
-
-    last_seen = db.Column(
-        db.DateTime,
-        default=lambda: datetime.now(timezone.utc)
+    following = so.relationship(
+        'User', secondary=followers,
+        primaryjoin=(followers.c.follower_id == id),
+        secondaryjoin=(followers.c.followed_id == id),
+        backref=so.backref('followers', lazy='dynamic'),
+        lazy='dynamic'
     )
 
+    def __repr__(self):
+        return f'<User {self.username}>'
+
+    # Password methods
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
+    # Avatar
     def avatar(self, size):
         digest = md5(self.email.lower().encode('utf-8')).hexdigest()
-        return f"https://www.gravatar.com/avatar/{digest}?d=identicon&s={size}"
+        return f'https://www.gravatar.com/avatar/{digest}?d=identicon&s={size}'
+
+    # Follow system methods
+    def follow(self, user):
+        if not self.is_following(user):
+            self.following.append(user)
+
+    def unfollow(self, user):
+        if self.is_following(user):
+            self.following.remove(user)
+
+    def is_following(self, user):
+        return self.following.filter(
+            followers.c.followed_id == user.id).count() > 0
+
+    def followers_count(self):
+        return self.followers.count()
+
+    def following_count(self):
+        return self.following.count()
+
+
+class Post(db.Model):
+    id = sa.Column(sa.Integer, primary_key=True)
+    body = sa.Column(sa.String(140))
+    timestamp = sa.Column(sa.DateTime,
+                          index=True,
+                          default=lambda: datetime.now(timezone.utc))
+    user_id = sa.Column(sa.Integer, sa.ForeignKey('user.id'))
+
+    author = so.relationship('User', back_populates='posts')
 
     def __repr__(self):
-        return f"<User {self.username}>"
+        return f'<Post {self.body}>'
 
 
 @login.user_loader
