@@ -9,6 +9,25 @@
 <p>{{ user.about_me }}</p>
 {% endif %}
 
+<p>{{ user.followers_count() }} followers,
+    {{ user.following_count() }} following</p>
+    
+    {% if user == current_user %}
+    <a href="{{ url_for('edit_profile') }}">Edit profile</a>
+    
+    {% elif not current_user.is_following(user) %}
+    <form action="{{ url_for('follow', username=user.username) }}" method="post">
+        {{ form.hidden_tag() }}
+        {{ form.submit(value='Follow') }}
+    </form>
+    
+    {% else %}
+    <form action="{{ url_for('unfollow', username=user.username) }}" method="post">
+        {{ form.hidden_tag() }}
+        {{ form.submit(value='Unfollow') }}
+    </form>
+    {% endif %}
+    
 {% if user == current_user %}
 <a href="{{ url_for('edit_profile') }}">Edit Profile</a>
 {% endif %}
