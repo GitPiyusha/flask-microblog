@@ -4,11 +4,10 @@ from datetime import datetime, timezone
 import sqlalchemy as sa
 
 from app import app, db
-from app.models import User
-from app.forms import EditProfileForm, LoginForm, EmptyForm
+from app.models import User, Post
+from app.forms import EditProfileForm, LoginForm, EmptyForm, PostForm
 
 
-# ---------------- BEFORE REQUEST ----------------
 @app.before_request
 def before_request():
     if current_user.is_authenticated:
@@ -16,7 +15,6 @@ def before_request():
         db.session.commit()
 
 
-# ---------------- LOGIN ----------------
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
@@ -39,26 +37,51 @@ def login():
     return render_template('login.html', title='Sign In', form=form)
 
 
-# ---------------- LOGOUT ----------------
 @app.route('/logout')
 def logout():
     logout_user()
     return redirect(url_for('login'))
 
 
-# ---------------- HOME ----------------
-@app.route('/')
-@app.route('/index')
+@app.route('/', methods=['GET', 'POST'])
+@app.route('/index', methods=['GET', 'POST'])
 @login_required
 def index():
-    posts = [
-        {'author': current_user, 'body': 'Test post 1'},
-        {'author': current_user, 'body': 'Test post 2'}
-    ]
-    return render_template('index.html', posts=posts)
+    form = PostForm()
+
+    if form.validate_on_submit():
+        post = Post(body=form.post.data, author=current_user)
+        db.session.add(post)
+        db.session.commit()
+        flash('Your post is now live!')
+        return redirect(url_for('index'))
+
+    # ✅ FIXED FEED QUERY
+    posts = db.session.scalars(
+            current_user.following_posts()
+        ).all()
+
+    return render_template(
+        'index.html',
+        title='Home',
+        form=form,
+        posts=posts
+    )
 
 
-# ---------------- USER PROFILE (ONLY ONE VERSION) ----------------
+@app.route('/explore')
+@login_required
+def explore():
+    query = sa.select(Post).order_by(Post.timestamp.desc())
+    posts = db.session.scalars(query).all()
+
+    return render_template(
+        'index.html',
+        title='Explore',
+        posts=posts
+    )
+
+
 @app.route('/user/<username>')
 @login_required
 def user(username):
@@ -70,7 +93,10 @@ def user(username):
         flash('User not found.')
         return redirect(url_for('index'))
 
-    posts = []
+    posts = db.session.scalars(
+        user.posts.select().order_by(Post.timestamp.desc())
+    ).all()
+
     form = EmptyForm()
 
     return render_template(
@@ -81,7 +107,6 @@ def user(username):
     )
 
 
-# ---------------- EDIT PROFILE ----------------
 @app.route('/edit_profile', methods=['GET', 'POST'])
 @login_required
 def edit_profile():
@@ -105,7 +130,6 @@ def edit_profile():
     )
 
 
-# ---------------- FOLLOW ----------------
 @app.route('/follow/<username>', methods=['POST'])
 @login_required
 def follow(username):
@@ -113,7 +137,8 @@ def follow(username):
 
     if form.validate_on_submit():
         user = db.session.scalar(
-            sa.select(User).where(User.username == username))
+            sa.select(User).where(User.username == username)
+        )
 
         if user is None:
             flash('User not found.')
@@ -131,7 +156,6 @@ def follow(username):
     return redirect(url_for('index'))
 
 
-# ---------------- UNFOLLOW ----------------
 @app.route('/unfollow/<username>', methods=['POST'])
 @login_required
 def unfollow(username):
@@ -139,7 +163,8 @@ def unfollow(username):
 
     if form.validate_on_submit():
         user = db.session.scalar(
-            sa.select(User).where(User.username == username))
+            sa.select(User).where(User.username == username)
+        )
 
         if user is None:
             flash('User not found.')
