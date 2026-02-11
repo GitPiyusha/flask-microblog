@@ -8,7 +8,7 @@ from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 
 
-# Followers association table
+# ---------------- FOLLOWERS TABLE ----------------
 followers = sa.Table(
     'followers',
     db.metadata,
@@ -19,14 +19,17 @@ followers = sa.Table(
 )
 
 
+# ---------------- USER MODEL ----------------
 class User(UserMixin, db.Model):
     id = sa.Column(sa.Integer, primary_key=True)
     username = sa.Column(sa.String(64), index=True, unique=True)
     email = sa.Column(sa.String(120), index=True, unique=True)
     password_hash = sa.Column(sa.String(256))
     about_me = sa.Column(sa.String(140))
-    last_seen = sa.Column(sa.DateTime,
-                          default=lambda: datetime.now(timezone.utc))
+    last_seen = sa.Column(
+        sa.DateTime,
+        default=lambda: datetime.now(timezone.utc)
+    )
 
     posts = so.relationship('Post', back_populates='author')
 
@@ -38,39 +41,24 @@ class User(UserMixin, db.Model):
         lazy='dynamic'
     )
 
-    following = so.relationship(
-    'User',
-    secondary=followers,
-    primaryjoin=(followers.c.follower_id == id),
-    secondaryjoin=(followers.c.followed_id == id),
-    back_populates='followers'
-    )
-
-    followers = so.relationship(
-        'User',
-        secondary=followers,
-        primaryjoin=(followers.c.followed_id == id),
-        secondaryjoin=(followers.c.follower_id == id),
-        back_populates='following'
-    )
-
-
     def __repr__(self):
         return f'<User {self.username}>'
 
-    # Password methods
+    # ---------------- PASSWORD ----------------
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 
     def check_password(self, password):
+        if self.password_hash is None:
+            return False
         return check_password_hash(self.password_hash, password)
 
-    # Avatar
+    # ---------------- AVATAR ----------------
     def avatar(self, size):
         digest = md5(self.email.lower().encode('utf-8')).hexdigest()
         return f'https://www.gravatar.com/avatar/{digest}?d=identicon&s={size}'
 
-    # Follow system methods
+    # ---------------- FOLLOW SYSTEM ----------------
     def follow(self, user):
         if not self.is_following(user):
             self.following.append(user)
@@ -89,13 +77,33 @@ class User(UserMixin, db.Model):
     def following_count(self):
         return self.following.count()
 
+    # ---------------- FEED POSTS (FINAL FIXED) ----------------
+    def following_posts(self):
+        followed = (
+            sa.select(Post)
+            .join(followers,
+                  followers.c.followed_id == Post.user_id)
+            .where(followers.c.follower_id == self.id)
+        )
 
+        own = sa.select(Post).where(Post.user_id == self.id)
+
+        union_query = followed.union(own).subquery()
+
+        return sa.select(Post).join(
+            union_query, Post.id == union_query.c.id
+        ).order_by(Post.timestamp.desc())
+
+
+# ---------------- POST MODEL ----------------
 class Post(db.Model):
     id = sa.Column(sa.Integer, primary_key=True)
     body = sa.Column(sa.String(140))
-    timestamp = sa.Column(sa.DateTime,
-                          index=True,
-                          default=lambda: datetime.now(timezone.utc))
+    timestamp = sa.Column(
+        sa.DateTime,
+        index=True,
+        default=lambda: datetime.now(timezone.utc)
+    )
     user_id = sa.Column(sa.Integer, sa.ForeignKey('user.id'))
 
     author = so.relationship('User', back_populates='posts')
@@ -104,6 +112,7 @@ class Post(db.Model):
         return f'<Post {self.body}>'
 
 
+# ---------------- LOGIN LOADER ----------------
 @login.user_loader
 def load_user(id):
     return db.session.get(User, int(id))
