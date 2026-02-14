@@ -21,6 +21,10 @@
         {{ form.submit(value='Follow') }}
     </form>
     
+    {% if user.last_seen %}
+    <p>Last seen on: {{ user.last_seen.strftime('%d %b %Y %I:%M %p') }}</p>
+    {% endif %}
+
     {% else %}
     <form action="{{ url_for('unfollow', username=user.username) }}" method="post">
         {{ form.hidden_tag() }}
@@ -28,10 +32,6 @@
     </form>
     {% endif %}
     
-{% if user == current_user %}
-<a href="{{ url_for('edit_profile') }}">Edit Profile</a>
-{% endif %}
-
 <hr>
 
 {% for post in posts %}
@@ -39,3 +39,4 @@
 {% endfor %}
 
 {% endblock %}
+
