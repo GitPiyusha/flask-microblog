@@ -20,4 +20,16 @@
     {% include "_post.html" %}
 {% endfor %}
 
+<!-- ✅ ADD PAGINATION HERE -->
+<nav>
+  <ul class="pagination">
+    <li class="page-item {% if not prev_url %}disabled{% endif %}">
+      <a class="page-link" href="{{ prev_url }}">Newer</a>
+    </li>
+    <li class="page-item {% if not next_url %}disabled{% endif %}">
+      <a class="page-link" href="{{ next_url }}">Older</a>
+    </li>
+  </ul>
+</nav>
+
 {% endblock %}
