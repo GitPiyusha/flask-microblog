@@ -1,17 +1,18 @@
-<div class="card mb-3">
-  <div class="card-body d-flex">
-    <div class="me-3">
-      <a href="{{ url_for('user', username=post.author.username) }}">
-        <img src="{{ post.author.avatar(70) }}" class="rounded-circle">
-      </a>
-    </div>
-    <div>
-      <strong>
-        <a href="{{ url_for('user', username=post.author.username) }}">
-          {{ post.author.username }}
-        </a>
-      </strong>
-      <p class="mb-0">{{ post.body }}</p>
-    </div>
-  </div>
-</div>
+<table class="table table-hover">
+    <tr>
+        <td width="70px">
+            <a href="{{ url_for('user', username=post.author.username) }}">
+                <img src="{{ post.author.avatar(70) }}">
+            </a>
+        </td>
+        <td>
+            <a href="{{ url_for('user', username=post.author.username) }}">
+                {{ post.author.username }}
+            </a>
+            said
+            {{ moment(post.timestamp).fromNow() }}:
+            <br>
+            {{ post.body }}
+        </td>
+    </tr>
+</table>

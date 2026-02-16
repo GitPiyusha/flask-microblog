@@ -5,8 +5,15 @@ import sqlalchemy as sa
 
 from app import app, db
 from app.models import User, Post
-from app.forms import EditProfileForm, LoginForm, EmptyForm, PostForm
-from app.forms import ResetPasswordRequestForm, ResetPasswordForm
+from app.forms import (
+    RegistrationForm,
+    EditProfileForm,
+    LoginForm,
+    EmptyForm,
+    PostForm,
+    ResetPasswordRequestForm,
+    ResetPasswordForm
+)
 from app.email import send_password_reset_email
 
 
@@ -45,7 +52,6 @@ def logout():
     return redirect(url_for('login'))
 
 
-# ✅ UPDATED INDEX WITH PAGINATION
 @app.route('/', methods=['GET', 'POST'])
 @app.route('/index', methods=['GET', 'POST'])
 @login_required
@@ -67,11 +73,8 @@ def index():
         per_page=5
     )
 
-    next_url = url_for('index', page=posts.next_num) \
-        if posts.has_next else None
-
-    prev_url = url_for('index', page=posts.prev_num) \
-        if posts.has_prev else None
+    next_url = url_for('index', page=posts.next_num) if posts.has_next else None
+    prev_url = url_for('index', page=posts.prev_num) if posts.has_prev else None
 
     return render_template(
         'index.html',
@@ -83,7 +86,6 @@ def index():
     )
 
 
-# ✅ UPDATED EXPLORE WITH PAGINATION
 @app.route('/explore')
 @login_required
 def explore():
@@ -97,11 +99,8 @@ def explore():
         per_page=5
     )
 
-    next_url = url_for('explore', page=posts.next_num) \
-        if posts.has_next else None
-
-    prev_url = url_for('explore', page=posts.prev_num) \
-        if posts.has_prev else None
+    next_url = url_for('explore', page=posts.next_num) if posts.has_next else None
+    prev_url = url_for('explore', page=posts.prev_num) if posts.has_prev else None
 
     return render_template(
         'index.html',
@@ -124,7 +123,6 @@ def user(username):
         return redirect(url_for('index'))
 
     posts = user.posts.order_by(Post.timestamp.desc()).all()
-
     form = EmptyForm()
 
     return render_template(
@@ -212,7 +210,6 @@ def unfollow(username):
 
 @app.route('/reset_password_request', methods=['GET', 'POST'])
 def reset_password_request():
-
     if current_user.is_authenticated:
         return redirect(url_for('index'))
 
@@ -227,7 +224,6 @@ def reset_password_request():
             send_password_reset_email(user)
 
         flash('Check your email for the instructions to reset your password')
-
         return redirect(url_for('login'))
 
     return render_template(
@@ -239,7 +235,6 @@ def reset_password_request():
 
 @app.route('/reset_password/<token>', methods=['GET', 'POST'])
 def reset_password(token):
-
     if current_user.is_authenticated:
         return redirect(url_for('index'))
 
@@ -253,8 +248,10 @@ def reset_password(token):
     if form.validate_on_submit():
         user.set_password(form.password.data)
         db.session.commit()
-
         flash('Your password has been reset.')
         return redirect(url_for('login'))
 
-    return render_template('reset_password.html', form=form)
+    return render_template(
+        'reset_password.html',
+        form=form
+    )
